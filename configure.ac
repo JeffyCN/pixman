@@ -187,6 +187,18 @@ PIXMAN_CHECK_CFLAG([-Wdeclaration-after-statement])
 PIXMAN_CHECK_CFLAG([-Wno-unused-local-typedefs])
 PIXMAN_CHECK_CFLAG([-fno-strict-aliasing])
 
+dnl check for rockchip RGA
+RGA_LIBS=
+RGA_HEADER=
+
+AC_CHECK_LIB([rga], [c_RkRgaInit], RGA_LIBS="-lrga")
+AC_CHECK_HEADERS([rga/RgaApi.h], RGA_HEADER="yes")
+
+if test "x$RGA_LIBS" != "x" && test "x$RGA_HEADER" = "xyes"; then
+  AC_SUBST(RGA_LIBS)
+  AC_DEFINE(HAVE_RGA, 1, [Have rockchip RGA])
+fi
+
 dnl =========================================================================
 dnl OpenMP for the test suite?
 dnl
