@@ -704,6 +704,7 @@ struct pixman_indexed
 
 /* HACK: Use maximum value to avoid conflict */
 #define PIXMAN_TYPE_NV12	0x3f
+#define PIXMAN_TYPE_I420	0x3e
 
 #define PIXMAN_FORMAT_COLOR(f)				\
 	(PIXMAN_FORMAT_TYPE(f) == PIXMAN_TYPE_ARGB ||	\
@@ -786,6 +787,7 @@ typedef enum {
 /* YUV formats */
     PIXMAN_yuy2 =	 PIXMAN_FORMAT(16,PIXMAN_TYPE_YUY2,0,0,0,0),
     PIXMAN_yv12 =	 PIXMAN_FORMAT(12,PIXMAN_TYPE_YV12,0,0,0,0),
+    PIXMAN_i420 =	 PIXMAN_FORMAT(12,PIXMAN_TYPE_I420,0,0,0,0),
     PIXMAN_nv12 =	 PIXMAN_FORMAT(12,PIXMAN_TYPE_NV12,0,0,0,0),
 } pixman_format_code_t;
 

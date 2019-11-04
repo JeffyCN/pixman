@@ -193,6 +193,15 @@
                   ((stride) >> 1) * ((line) >> 1)))
 
 /*
+ * I420 setup and access macros
+ */
+
+#define I420_SETUP(image) YV12_SETUP(image)
+#define I420_Y(line) YV12_Y(line)
+#define I420_U(line) YV12_V(line)
+#define I420_V(line) YV12_U(line)
+
+/*
  * NV12 setup and access macros
  */
 
@@ -865,6 +874,43 @@ fetch_scanline_yv12 (bits_image_t   *image,
 }
 
 static void
+fetch_scanline_i420 (bits_image_t   *image,
+                     int             x,
+                     int             line,
+                     int             width,
+                     uint32_t *      buffer,
+                     const uint32_t *mask)
+{
+    I420_SETUP (image);
+    uint8_t *y_line = I420_Y (line);
+    uint8_t *u_line = I420_U (line);
+    uint8_t *v_line = I420_V (line);
+    int i;
+    
+    for (i = 0; i < width; i++)
+    {
+	int16_t y, u, v;
+	int32_t r, g, b;
+
+	y = y_line[x + i] - 16;
+	u = u_line[(x + i) >> 1] - 128;
+	v = v_line[(x + i) >> 1] - 128;
+
+	/* R = 1.164(Y - 16) + 1.596(V - 128) */
+	r = 0x012b27 * y + 0x019a2e * v;
+	/* G = 1.164(Y - 16) - 0.813(V - 128) - 0.391(U - 128) */
+	g = 0x012b27 * y - 0x00d0f2 * v - 0x00647e * u;
+	/* B = 1.164(Y - 16) + 2.018(U - 128) */
+	b = 0x012b27 * y + 0x0206a2 * u;
+
+	*buffer++ = 0xff000000 |
+	    (r >= 0 ? r < 0x1000000 ? r         & 0xff0000 : 0xff0000 : 0) |
+	    (g >= 0 ? g < 0x1000000 ? (g >> 8)  & 0x00ff00 : 0x00ff00 : 0) |
+	    (b >= 0 ? b < 0x1000000 ? (b >> 16) & 0x0000ff : 0x0000ff : 0);
+    }
+}
+
+static void
 fetch_scanline_nv12 (bits_image_t   *image,
                      int             x,
                      int             line,
@@ -1074,6 +1120,32 @@ fetch_pixel_yv12 (bits_image_t *image,
     int16_t y = YV12_Y (line)[offset] - 16;
     int16_t u = YV12_U (line)[offset >> 1] - 128;
     int16_t v = YV12_V (line)[offset >> 1] - 128;
+    int32_t r, g, b;
+    
+    /* R = 1.164(Y - 16) + 1.596(V - 128) */
+    r = 0x012b27 * y + 0x019a2e * v;
+    
+    /* G = 1.164(Y - 16) - 0.813(V - 128) - 0.391(U - 128) */
+    g = 0x012b27 * y - 0x00d0f2 * v - 0x00647e * u;
+    
+    /* B = 1.164(Y - 16) + 2.018(U - 128) */
+    b = 0x012b27 * y + 0x0206a2 * u;
+    
+    return 0xff000000 |
+	(r >= 0 ? r < 0x1000000 ? r         & 0xff0000 : 0xff0000 : 0) |
+	(g >= 0 ? g < 0x1000000 ? (g >> 8)  & 0x00ff00 : 0x00ff00 : 0) |
+	(b >= 0 ? b < 0x1000000 ? (b >> 16) & 0x0000ff : 0x0000ff : 0);
+}
+
+static uint32_t
+fetch_pixel_i420 (bits_image_t *image,
+		  int           offset,
+		  int           line)
+{
+    I420_SETUP (image);
+    int16_t y = I420_Y (line)[offset] - 16;
+    int16_t u = I420_U (line)[offset >> 1] - 128;
+    int16_t v = I420_V (line)[offset >> 1] - 128;
     int32_t r, g, b;
     
     /* R = 1.164(Y - 16) + 1.596(V - 128) */
@@ -1588,6 +1660,11 @@ static const format_info_t accessors[] =
     { PIXMAN_yv12,
       fetch_scanline_yv12, fetch_scanline_generic_float,
       fetch_pixel_yv12, fetch_pixel_generic_float,
+      NULL, NULL },
+
+    { PIXMAN_i420,
+      fetch_scanline_i420, fetch_scanline_generic_float,
+      fetch_pixel_i420, fetch_pixel_generic_float,
       NULL, NULL },
     
     { PIXMAN_nv12,
