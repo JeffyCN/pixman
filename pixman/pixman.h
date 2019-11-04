@@ -702,6 +702,9 @@ struct pixman_indexed
 #define PIXMAN_TYPE_ARGB_SRGB	10
 #define PIXMAN_TYPE_RGBA_FLOAT	11
 
+/* HACK: Use maximum value to avoid conflict */
+#define PIXMAN_TYPE_NV12	0x3f
+
 #define PIXMAN_FORMAT_COLOR(f)				\
 	(PIXMAN_FORMAT_TYPE(f) == PIXMAN_TYPE_ARGB ||	\
 	 PIXMAN_FORMAT_TYPE(f) == PIXMAN_TYPE_ABGR ||	\
@@ -782,7 +785,8 @@ typedef enum {
 
 /* YUV formats */
     PIXMAN_yuy2 =	 PIXMAN_FORMAT(16,PIXMAN_TYPE_YUY2,0,0,0,0),
-    PIXMAN_yv12 =	 PIXMAN_FORMAT(12,PIXMAN_TYPE_YV12,0,0,0,0)
+    PIXMAN_yv12 =	 PIXMAN_FORMAT(12,PIXMAN_TYPE_YV12,0,0,0,0),
+    PIXMAN_nv12 =	 PIXMAN_FORMAT(12,PIXMAN_TYPE_NV12,0,0,0,0),
 } pixman_format_code_t;
 
 /* Querying supported format values. */

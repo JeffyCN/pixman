@@ -192,6 +192,25 @@
     ((uint8_t *) ((bits) + offset0 +                                    \
                   ((stride) >> 1) * ((line) >> 1)))
 
+/*
+ * NV12 setup and access macros
+ */
+
+#define NV12_SETUP(image)                                               \
+    bits_image_t *__bits_image = (bits_image_t *)image;                 \
+    uint32_t *bits = __bits_image->bits;                                \
+    int stride = __bits_image->rowstride;                               \
+    int offset0 = stride < 0 ?                                          \
+    (-stride) * ((__bits_image->height - 1) >> 1) - stride :	\
+    stride * __bits_image->height
+
+#define NV12_Y(line)                                                    \
+    ((uint8_t *) ((bits) + (stride) * (line)))
+
+#define NV12_UV(line)                                                    \
+    ((uint8_t *) ((bits) + offset0 +                                    \
+                  (stride) * ((line) >> 1)))
+
 /* Misc. helpers */
 
 static force_inline void
@@ -845,6 +864,42 @@ fetch_scanline_yv12 (bits_image_t   *image,
     }
 }
 
+static void
+fetch_scanline_nv12 (bits_image_t   *image,
+                     int             x,
+                     int             line,
+                     int             width,
+                     uint32_t *      buffer,
+                     const uint32_t *mask)
+{
+    NV12_SETUP (image);
+    uint8_t *y_line = NV12_Y (line);
+    uint8_t *uv_line = NV12_UV (line);
+    int i;
+    
+    for (i = 0; i < width; i++)
+    {
+	int16_t y, u, v;
+	int32_t r, g, b;
+
+	y = y_line[x + i] - 16;
+	u = uv_line[(x + i) & -2] - 128;
+	v = uv_line[((x + i) & -2) + 1] - 128;
+
+	/* R = 1.164(Y - 16) + 1.596(V - 128) */
+	r = 0x012b27 * y + 0x019a2e * v;
+	/* G = 1.164(Y - 16) - 0.813(V - 128) - 0.391(U - 128) */
+	g = 0x012b27 * y - 0x00d0f2 * v - 0x00647e * u;
+	/* B = 1.164(Y - 16) + 2.018(U - 128) */
+	b = 0x012b27 * y + 0x0206a2 * u;
+
+	*buffer++ = 0xff000000 |
+	    (r >= 0 ? r < 0x1000000 ? r         & 0xff0000 : 0xff0000 : 0) |
+	    (g >= 0 ? g < 0x1000000 ? (g >> 8)  & 0x00ff00 : 0x00ff00 : 0) |
+	    (b >= 0 ? b < 0x1000000 ? (b >> 16) & 0x0000ff : 0x0000ff : 0);
+    }
+}
+
 /**************************** Pixel wise fetching *****************************/
 
 #ifndef PIXMAN_FB_ACCESSORS
@@ -1019,6 +1074,32 @@ fetch_pixel_yv12 (bits_image_t *image,
     int16_t y = YV12_Y (line)[offset] - 16;
     int16_t u = YV12_U (line)[offset >> 1] - 128;
     int16_t v = YV12_V (line)[offset >> 1] - 128;
+    int32_t r, g, b;
+    
+    /* R = 1.164(Y - 16) + 1.596(V - 128) */
+    r = 0x012b27 * y + 0x019a2e * v;
+    
+    /* G = 1.164(Y - 16) - 0.813(V - 128) - 0.391(U - 128) */
+    g = 0x012b27 * y - 0x00d0f2 * v - 0x00647e * u;
+    
+    /* B = 1.164(Y - 16) + 2.018(U - 128) */
+    b = 0x012b27 * y + 0x0206a2 * u;
+    
+    return 0xff000000 |
+	(r >= 0 ? r < 0x1000000 ? r         & 0xff0000 : 0xff0000 : 0) |
+	(g >= 0 ? g < 0x1000000 ? (g >> 8)  & 0x00ff00 : 0x00ff00 : 0) |
+	(b >= 0 ? b < 0x1000000 ? (b >> 16) & 0x0000ff : 0x0000ff : 0);
+}
+
+static uint32_t
+fetch_pixel_nv12 (bits_image_t *image,
+		  int           offset,
+		  int           line)
+{
+    NV12_SETUP (image);
+    int16_t y = NV12_Y (line)[offset] - 16;
+    int16_t u = NV12_UV (line)[offset & -2] - 128;
+    int16_t v = NV12_UV (line)[(offset & -2) + 1] - 128;
     int32_t r, g, b;
     
     /* R = 1.164(Y - 16) + 1.596(V - 128) */
@@ -1509,6 +1590,11 @@ static const format_info_t accessors[] =
       fetch_pixel_yv12, fetch_pixel_generic_float,
       NULL, NULL },
     
+    { PIXMAN_nv12,
+      fetch_scanline_nv12, fetch_scanline_generic_float,
+      fetch_pixel_nv12, fetch_pixel_generic_float,
+      NULL, NULL },
+
     { PIXMAN_null },
 };
 
